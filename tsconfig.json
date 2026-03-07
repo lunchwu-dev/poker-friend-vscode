@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@poker-friends/shared": ["packages/shared/src"],
+      "@poker-friends/shared/*": ["packages/shared/src/*"]
+    }
+  },
+  "references": [
+    { "path": "packages/shared" },
+    { "path": "apps/server" }
+  ]
+}

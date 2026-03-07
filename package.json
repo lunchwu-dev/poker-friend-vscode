@@ -1,0 +1,29 @@
+{
+  "name": "poker-friends",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Poker Friends - Texas Hold'em mobile game",
+  "scripts": {
+    "dev:server": "pnpm --filter @poker-friends/server dev",
+    "dev:mobile": "pnpm --filter @poker-friends/mobile start",
+    "build:server": "pnpm --filter @poker-friends/server build",
+    "build:shared": "pnpm --filter @poker-friends/shared build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "clean": "pnpm -r clean"
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=10.0.0"
+  },
+  "packageManager": "pnpm@10.30.3",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@nestjs/core",
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma"
+    ]
+  }
+}

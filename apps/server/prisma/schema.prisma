@@ -1,0 +1,65 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String    @id @default(uuid()) @db.Uuid
+  nickname       String    @db.VarChar(20)
+  avatar         String    @default("default_01") @db.VarChar(50)
+  phone          String?   @unique @db.VarChar(20)
+  coins          BigInt    @default(10000)
+  totalHands     Int       @default(0) @map("total_hands")
+  totalWins      Int       @default(0) @map("total_wins")
+  totalProfit    BigInt    @default(0) @map("total_profit")
+  bestHandRank   Int?      @map("best_hand_rank") @db.SmallInt
+  maxSingleWin   BigInt    @default(0) @map("max_single_win")
+  guestDeviceId  String?   @map("guest_device_id") @db.VarChar(100)
+  wechatOpenid   String?   @unique @map("wechat_openid") @db.VarChar(100)
+  appleSub       String?   @unique @map("apple_sub") @db.VarChar(100)
+  lastDailyBonus DateTime? @map("last_daily_bonus") @db.Date
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  handPlayers HandPlayer[]
+
+  @@map("users")
+}
+
+model HandHistory {
+  id             String   @id @default(uuid()) @db.Uuid
+  roomCode       String   @map("room_code") @db.VarChar(6)
+  handNumber     Int      @map("hand_number")
+  playerCount    Int      @map("player_count") @db.SmallInt
+  communityCards String?  @map("community_cards") @db.VarChar(20)
+  potTotal       BigInt   @map("pot_total")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  handPlayers HandPlayer[]
+
+  @@index([createdAt])
+  @@map("hand_histories")
+}
+
+model HandPlayer {
+  id            String   @id @default(uuid()) @db.Uuid
+  handId        String   @map("hand_id") @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  seatIndex     Int      @map("seat_index") @db.SmallInt
+  holeCards     String?  @map("hole_cards") @db.VarChar(10)
+  finalHandRank Int?     @map("final_hand_rank") @db.SmallInt
+  chipsChange   BigInt   @map("chips_change")
+  isWinner      Boolean  @default(false) @map("is_winner")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  hand HandHistory @relation(fields: [handId], references: [id])
+  user User        @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([handId])
+  @@map("hand_players")
+}
