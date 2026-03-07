@@ -3,11 +3,13 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { LoginScreen } from '../screens/LoginScreen';
 import { HomeScreen } from '../screens/HomeScreen';
+import { RoomLobbyScreen } from '../screens/RoomLobbyScreen';
 import { GameTableScreen } from '../screens/GameTableScreen';
 
 export type RootStackParamList = {
   Login: undefined;
   Home: undefined;
+  RoomLobby: { roomCode: string };
   GameTable: { roomCode: string };
 };
 
@@ -34,6 +36,7 @@ export function RootNavigator() {
       >
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="RoomLobby" component={RoomLobbyScreen} />
         <Stack.Screen name="GameTable" component={GameTableScreen} />
       </Stack.Navigator>
     </NavigationContainer>
