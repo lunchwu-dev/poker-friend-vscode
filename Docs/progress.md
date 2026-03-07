@@ -142,9 +142,29 @@
 **E2E 验证**: REST Login → WebSocket 连接 → 建房 → 加入 → 入座 → 发牌 → 行动 → 结算 ✅
 
 ### P3 — 客户端
-- [ ] 牌桌 UI (Skia 渲染)
-- [ ] Socket.IO 通信层 + Zustand 状态管理
-- [ ] 登录/主界面 完善
+### P3 — 客户端基础（✅ 已完成）
+
+**完成时间**: 2026-03-07
+
+| # | 任务 | 状态 | 备注 |
+|---|------|------|------|
+| 1 | SocketService 通信封装 | ✅ | 类型安全的 Socket.IO 包装，支持自动重连，事件发布订阅 |
+| 2 | Zustand 状态管理 | ✅ | authStore (登录/JWT) + roomStore (房间) + gameStore (牌局) |
+| 3 | useSocketEvents Hook | ✅ | 将服务端 Socket 事件自动同步到 Zustand stores |
+| 4 | LoginScreen | ✅ | 游客登录对接真实 API + Socket 连接 + 昵称输入 |
+| 5 | HomeScreen | ✅ | 创建房间 + 输入房间号加入 + 用户信息显示 + 退出登录 |
+| 6 | RoomLobbyScreen | ✅ | 座位选择 + 入座/站起 + 分享房间号 + 开始游戏 |
+| 7 | CardView 组件 | ✅ | 扑克牌渲染 (正面/背面, sm/md/lg 三种尺寸) |
+| 8 | PlayerSeat 组件 | ✅ | 头像/昵称/筹码/状态/庄家标记/底牌/下注显示 |
+| 9 | GameTableScreen | ✅ | 绿色毛毡椭圆牌桌 + 6座位布局 + 公共牌 + 底池 |
+| 10 | ActionPanel | ✅ | 弃牌/过牌/跟注/加注(滑动条)/全押 操作面板 |
+| 11 | SettlementOverlay | ✅ | 结算弹窗: 赢家/筹码/摊牌手牌/牌型/公共牌 |
+| 12 | 导航更新 | ✅ | RoomLobby 加入导航栈, Deep Link 配置保留 |
+
+**新增文件**: 10 files, 1894 insertions  
+**依赖**: @react-native-community/slider  
+**提交**: `9cb5cf5`  
+**验证**: TypeScript 零错误, 服务端 99 tests 全部通过
 
 ### P4 — 联调集成
 - [ ] 端到端游戏流程联调
