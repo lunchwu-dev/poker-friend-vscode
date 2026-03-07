@@ -9,6 +9,7 @@ module.exports = {
   coverageDirectory: '../coverage',
   testEnvironment: 'node',
   moduleNameMapper: {
-    '^@poker-friends/shared(.*)$': '<rootDir>/../../packages/shared/src$1',
+    '^@poker-friends/shared(.*)$': '<rootDir>/../../../packages/shared/src$1',
   },
+  roots: ['<rootDir>'],
 };

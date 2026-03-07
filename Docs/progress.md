@@ -67,33 +67,60 @@
 
 ---
 
-## 后续阶段（待开始）
+## P0 — 项目初始化（✅ 已完成）
 
-> 以下为 `implementation-plan-v1.md` 中规划的工程实施阶段，开始时在此记录进度。
+**完成时间**: 2026-03-07
 
-### P0 — 项目初始化
-- [ ] Monorepo 脚手架搭建
-- [ ] 共享类型包 (packages/shared)
-- [ ] CI/CD 基础流程
-- [ ] 开发环境配置 (Docker Compose)
+| # | 任务 | 状态 | 备注 |
+|---|------|------|------|
+| 1 | Monorepo 脚手架搭建 | ✅ | pnpm workspace, root configs (tsconfig, eslint, prettier) |
+| 2 | 共享类型包 (packages/shared) | ✅ | Card/Game/Room/User/Events 类型 + 常量, composite build |
+| 3 | CI/CD 基础流程 | ✅ | GitHub Actions ci.yml (lint, typecheck, build, test) |
+| 4 | 开发环境配置 (Docker Compose) | ✅ | PostgreSQL 16 + Redis 7 容器, healthcheck |
+| 5 | NestJS 服务端骨架 | ✅ | Health endpoint, Prisma schema + migration, Game engine services |
+| 6 | GitHub 仓库 | ✅ | lunchwu-dev/poker-friend-vscode, 初始提交 67 files |
 
-### P1 — 游戏引擎核心
-- [ ] DeckService (洗牌/发牌)
-- [ ] EvaluatorService (牌型评估)
-- [ ] PotService (底池/边池计算)
-- [ ] GameService 状态机
+**开发工具**:
+- Node.js v24.14.0, pnpm 10.30.3, TypeScript 5.9.3
+- Docker Desktop 29.2.1 (WSL2), JDK 21, Android Studio 2025.3
+- Git 2.53.0, GitHub CLI 2.87.3
+
+---
+
+## P0.5 — React Native 客户端脚手架（✅ 已完成）
+
+**完成时间**: 2026-03-07
+
+| # | 任务 | 状态 | 备注 |
+|---|------|------|------|
+| 1 | React Native 初始化 | ✅ | RN 0.84.1 bare workflow, app name: PokerFriends |
+| 2 | Monorepo Metro 配置 | ✅ | watchFolders + resolver nodeModulesPaths for pnpm workspace |
+| 3 | 导航框架 | ✅ | React Navigation 7 native-stack (Login/Home/GameTable) |
+| 4 | 核心依赖 | ✅ | zustand, socket.io-client, reanimated, gesture-handler |
+| 5 | src/ 目录结构 | ✅ | screens, navigation, components, stores, services, hooks, utils, assets |
+| 6 | 基础页面 | ✅ | LoginScreen, HomeScreen, GameTableScreen (dark theme + gold accents) |
+| 7 | workspace 联动 | ✅ | @poker-friends/shared 链接, TypeScript 检查通过 |
+
+**提交**: `fc4716f` — 58 files, 9380 insertions
+
+---
+
+## P1 — 游戏引擎核心（待开始）
+
+- [ ] DeckService (洗牌/发牌) 单元测试
+- [ ] EvaluatorService (牌型评估) 完整实现
+- [ ] PotService (底池/边池计算) 完整实现
+- [ ] GameService 状态机 完整实现
 
 ### P2 — 服务端
-- [ ] 数据库 schema + Prisma 迁移
 - [ ] 用户认证 (JWT + 游客/手机号)
 - [ ] 房间管理 (创建/加入/Socket.IO Gateway)
 - [ ] 战绩记录
 
 ### P3 — 客户端
-- [ ] 导航框架 + 页面骨架
-- [ ] 登录/主界面
 - [ ] 牌桌 UI (Skia 渲染)
 - [ ] Socket.IO 通信层 + Zustand 状态管理
+- [ ] 登录/主界面 完善
 
 ### P4 — 联调集成
 - [ ] 端到端游戏流程联调
