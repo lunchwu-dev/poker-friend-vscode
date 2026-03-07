@@ -105,17 +105,41 @@
 
 ---
 
-## P1 — 游戏引擎核心（待开始）
+## P1 — 游戏引擎核心（✅ 已完成）
 
-- [ ] DeckService (洗牌/发牌) 单元测试
-- [ ] EvaluatorService (牌型评估) 完整实现
-- [ ] PotService (底池/边池计算) 完整实现
-- [ ] GameService 状态机 完整实现
+**完成时间**: 2026-03-07
 
-### P2 — 服务端
-- [ ] 用户认证 (JWT + 游客/手机号)
-- [ ] 房间管理 (创建/加入/Socket.IO Gateway)
-- [ ] 战绩记录
+| # | 任务 | 状态 | 备注 |
+|---|------|------|------|
+| 1 | DeckService | ✅ | 52卡创建、Fisher-Yates 加密洗牌、发牌, 10 tests |
+| 2 | EvaluatorService | ✅ | 10种牌型评估、7→5最优选择(C(7,5)=21)、wheel处理, 22 tests |
+| 3 | PotService | ✅ | 主池/边池计算、all-in 分层、分配+奇数筹码, 13 tests |
+| 4 | GameEngineService | ✅ | 完整状态机(IDLE→SETTLE)、盲注、行动验证、超时、showdown, 20 tests |
+| 5 | Jest 配置修复 | ✅ | moduleNameMapper 路径修正, *.tsbuildinfo 加入 .gitignore |
+
+**测试**: 5 suites, 76 tests, ALL PASSED  
+**提交**: `944bce6` — 7 files, 841 insertions
+
+### P2 — 服务端（✅ 已完成）
+
+**完成时间**: 2026-03-07
+
+| # | 任务 | 状态 | 备注 |
+|---|------|------|------|
+| 1 | PrismaService | ✅ | 全局数据库连接服务, OnModuleInit/Destroy 生命周期 |
+| 2 | JWT 认证模块 | ✅ | @nestjs/jwt, 游客登录 (deviceId), 7天token, HTTP Guard + WS中间件 |
+| 3 | REST 端点 | ✅ | POST /auth/guest-login (ValidationPipe + class-validator) |
+| 4 | 房间管理服务 | ✅ | 创建(6位随机码)/加入/离开/入座/站起, 内存存储, socket映射 |
+| 5 | Socket.IO Gateway | ✅ | 全部18种事件处理, JWT握手认证, 操作超时自动check/fold |
+| 6 | 手牌历史服务 | ✅ | Prisma事务写入HandHistory+HandPlayer, 用户统计增量更新 |
+| 7 | AppModule 集成 | ✅ | PrismaModule(全局) + AuthModule + RoomModule + GameModule + GatewayModule |
+
+**测试**: 8 suites, 99 tests, ALL PASSED (含 P1 的 76 + P2 新增 23)
+- auth.service.spec.ts: 5 tests (游客登录、JWT签发/验证)
+- room.service.spec.ts: 16 tests (建房/加入/离开/入座/站起/状态查询/socket追踪)
+- history.service.spec.ts: 2 tests (手牌记录+用户统计更新)
+
+**E2E 验证**: REST Login → WebSocket 连接 → 建房 → 加入 → 入座 → 发牌 → 行动 → 结算 ✅
 
 ### P3 — 客户端
 - [ ] 牌桌 UI (Skia 渲染)
