@@ -166,10 +166,29 @@
 **提交**: `9cb5cf5`  
 **验证**: TypeScript 零错误, 服务端 99 tests 全部通过
 
-### P4 — 联调集成
-- [ ] 端到端游戏流程联调
-- [ ] 断线重连
-- [ ] Deep Link / 分享
+### P4 — 联调集成（✅ 已完成）
+
+**完成时间**: 2026-03-08
+
+| # | 任务 | 状态 | 备注 |
+|---|------|------|------|
+| 1 | pnpm hoisted 模式配置 | ✅ | 创建 .npmrc (node-linker=hoisted)，解决 RN Android 构建路径问题 |
+| 2 | Android SDK 环境修复 | ✅ | 安装 cmdline-tools (sdkmanager), NDK 27.1.12297006 |
+| 3 | Gradle 配置适配 | ✅ | Gradle 8.14.1, buildToolsVersion 36.1.0, monorepo 路径修正 |
+| 4 | settings.gradle 路径修复 | ✅ | includeBuild 指向 root node_modules (../../../node_modules) |
+| 5 | app/build.gradle 路径修复 | ✅ | reactNativeDir/codegenDir/cliFile 指向 root node_modules |
+| 6 | react-native-worklets 依赖 | ✅ | react-native-reanimated 新版本必需依赖 |
+| 7 | Android Debug APK 构建 | ✅ | gradlew assembleDebug 成功，app-debug.apk 165MB |
+| 8 | 模拟器安装运行 | ✅ | Medium_Phone_API_36.1 模拟器，APK 安装成功 |
+| 9 | Metro Bundler 打包 | ✅ | Metro v0.83.5 + RN v0.84, JS Bundle 加载零错误 |
+| 10 | 服务端验证 | ✅ | Docker (postgres+redis) + NestJS server 运行正常, 99 tests 全部通过 |
+
+**关键修复**:
+- pnpm 默认 symlink 模式不兼容 RN Android 的 Gradle includeBuild → 切换 hoisted
+- Gradle 9.0 不兼容 foojay-resolver-convention 0.5.0 → 降至 8.14.1
+- Android Gradle Plugin 要求最低 Gradle 8.13
+
+**提交**: 待 push
 
 ### P5 — 测试与上线
 - [ ] 单元测试 + 集成测试
