@@ -171,6 +171,14 @@ export class RoomService {
     return this.getRoom(roomCode)?.players.get(userId)?.socketId;
   }
 
+  /** Find which room a user is currently in */
+  findRoomByUserId(userId: string): string | undefined {
+    for (const [roomCode, room] of this.rooms) {
+      if (room.players.has(userId)) return roomCode;
+    }
+    return undefined;
+  }
+
   updateSeatChips(roomCode: string, playerId: string, chips: number): void {
     const room = this.getRoom(roomCode);
     if (!room) return;

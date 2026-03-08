@@ -5,6 +5,7 @@ import { LoginScreen } from '../screens/LoginScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import { RoomLobbyScreen } from '../screens/RoomLobbyScreen';
 import { GameTableScreen } from '../screens/GameTableScreen';
+import { StatsScreen } from '../screens/StatsScreen';
 import { useSocketEvents } from '../hooks/useSocketEvents';
 
 export type RootStackParamList = {
@@ -12,6 +13,7 @@ export type RootStackParamList = {
   Home: undefined;
   RoomLobby: { roomCode: string };
   GameTable: { roomCode: string };
+  Stats: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -42,6 +44,7 @@ export function RootNavigator() {
         <Stack.Screen name="Home" component={HomeScreen} />
         <Stack.Screen name="RoomLobby" component={RoomLobbyScreen} />
         <Stack.Screen name="GameTable" component={GameTableScreen} />
+        <Stack.Screen name="Stats" component={StatsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

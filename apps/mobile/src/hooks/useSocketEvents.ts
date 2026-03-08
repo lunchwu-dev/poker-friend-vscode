@@ -4,10 +4,11 @@ import { socketService } from '../services/socket';
 import { useAuthStore } from '../stores/authStore';
 import { useRoomStore } from '../stores/roomStore';
 import { useGameStore } from '../stores/gameStore';
+import { useConnectionStore } from '../stores/connectionStore';
 
 /**
  * Connects Socket.IO events to Zustand stores.
- * Mount once (e.g. after login).
+ * Mount once at app level (e.g. in RootNavigator).
  */
 export function useSocketEvents() {
   const userId = useAuthStore((s) => s.user?.id);
@@ -16,8 +17,17 @@ export function useSocketEvents() {
   useEffect(() => {
     const { setRoom, clearRoom } = useRoomStore.getState();
     const game = useGameStore.getState();
+    const { setStatus } = useConnectionStore.getState();
 
     unsubs.current.push(
+      socketService.on('connect', () => {
+        setStatus('connected');
+      }),
+
+      socketService.on('disconnect', () => {
+        setStatus('reconnecting');
+      }),
+
       socketService.on(SocketEvent.RoomState, (data) => {
         setRoom(data);
         if (!data.isPlaying) {

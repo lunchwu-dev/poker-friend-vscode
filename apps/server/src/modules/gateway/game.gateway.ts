@@ -14,6 +14,7 @@ import {
   SocketEvent,
   ActionType,
   SETTLE_DELAY_MS,
+  RECONNECT_TIMEOUT,
   type RoomCreatePayload,
   type RoomJoinPayload,
   type SeatSitPayload,
@@ -51,6 +52,9 @@ export class GameGateway
   /** roomCode → timeout handle */
   private readonly actionTimers = new Map<string, NodeJS.Timeout>();
 
+  /** userId → disconnect timeout handle */
+  private readonly disconnectTimers = new Map<string, NodeJS.Timeout>();
+
   constructor(
     private readonly authService: AuthService,
     private readonly roomService: RoomService,
@@ -63,11 +67,135 @@ export class GameGateway
   }
 
   handleConnection(client: AuthenticatedSocket) {
-    this.logger.log(`Connected: ${client.user.sub} (${client.user.nickname})`);
+    const { sub: userId, nickname } = client.user;
+    this.logger.log(`Connected: ${userId} (${nickname})`);
+
+    // Cancel any pending disconnect timer
+    const timer = this.disconnectTimers.get(userId);
+    if (timer) {
+      clearTimeout(timer);
+      this.disconnectTimers.delete(userId);
+      this.logger.log(`Reconnect: cancelled disconnect timer for ${userId}`);
+    }
+
+    // Check if user was in a room (reconnect scenario)
+    const roomCode = this.roomService.findRoomByUserId(userId);
+    if (roomCode) {
+      this.roomService.updateSocketId(roomCode, userId, client.id);
+      client.join(roomCode);
+      this.logger.log(`Reconnect: ${userId} rejoined room ${roomCode}`);
+
+      // Send full room state
+      const roomState = this.roomService.getRoomState(roomCode);
+      if (roomState) {
+        client.emit(SocketEvent.RoomState, roomState);
+      }
+
+      // If a game is in progress, resend game state snapshot
+      const room = this.roomService.getRoom(roomCode);
+      if (room?.isPlaying) {
+        const gameState = this.engine.getGameState(roomCode);
+        if (gameState) {
+          // Resend hand start with current seats
+          const startPayload: GameHandStartPayload = {
+            handNumber: gameState.handNumber,
+            dealerSeatIndex: gameState.dealerSeatIndex,
+            seats: room.seats,
+          };
+          client.emit(SocketEvent.GameHandStart, startPayload);
+
+          // Resend this player's hole cards
+          const playerState = gameState.players.find(
+            (p) => p.playerId === userId,
+          );
+          if (playerState?.holeCards && playerState.holeCards.length > 0) {
+            client.emit(SocketEvent.GameDealHole, {
+              cards: playerState.holeCards,
+            } as GameDealHolePayload);
+          }
+
+          // Resend community cards if any
+          if (gameState.communityCards.length > 0) {
+            client.emit(SocketEvent.GameDealCommunity, {
+              cards: gameState.communityCards,
+              stage: gameState.stage,
+            } as GameDealCommunityPayload);
+          }
+
+          // Resend action-on if waiting for someone
+          if (gameState.currentPlayerIndex !== null) {
+            const currentPlayer =
+              gameState.players[gameState.currentPlayerIndex];
+            const seat = room.seats.find(
+              (s) => s.playerId === currentPlayer.playerId,
+            );
+            const actions = this.engine.getAvailableActions(
+              roomCode,
+              currentPlayer.playerId,
+            );
+            if (seat && actions) {
+              client.emit(SocketEvent.GameActionOn, {
+                seatIndex: seat.seatIndex,
+                playerId: currentPlayer.playerId,
+                availableActions: actions,
+                timeoutMs: room.config.actionTimeout * 1000,
+              } as GameActionOnPayload);
+            }
+          }
+        }
+      }
+    }
   }
 
   handleDisconnect(client: AuthenticatedSocket) {
-    this.logger.log(`Disconnected: ${client.user.sub}`);
+    const { sub: userId } = client.user;
+    this.logger.log(`Disconnected: ${userId}`);
+
+    const roomCode = this.roomService.findRoomByUserId(userId);
+    if (!roomCode) return;
+
+    const room = this.roomService.getRoom(roomCode);
+    if (!room) return;
+
+    // Start disconnect timer
+    const disconnectTimer = setTimeout(() => {
+      this.disconnectTimers.delete(userId);
+      this.logger.log(`Disconnect timeout: ${userId} in room ${roomCode}`);
+
+      // If game is active and it's this player's turn, auto-fold
+      if (room.isPlaying) {
+        const gameState = this.engine.getGameState(roomCode);
+        if (gameState && gameState.currentPlayerIndex !== null) {
+          const currentPlayer =
+            gameState.players[gameState.currentPlayerIndex];
+          if (currentPlayer.playerId === userId) {
+            this.clearActionTimer(roomCode);
+            const result = this.engine.handleTimeout(roomCode);
+            if (result.valid) {
+              const autoAction: PlayerAction = {
+                action: ActionType.Fold,
+              };
+              this.broadcastActionResult(
+                roomCode,
+                userId,
+                autoAction,
+                result,
+              );
+            }
+          }
+        }
+      }
+
+      // If game is NOT active, remove from room
+      if (!room.isPlaying) {
+        this.roomService.leaveRoom(roomCode, userId);
+        this.server
+          .to(roomCode)
+          .emit(SocketEvent.RoomPlayerLeft, { playerId: userId });
+      }
+    }, RECONNECT_TIMEOUT * 1000);
+
+    this.disconnectTimers.set(userId, disconnectTimer);
   }
 
   // ── Room events ──────────────────────────────────────────────────────────

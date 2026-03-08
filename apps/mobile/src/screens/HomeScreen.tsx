@@ -98,6 +98,14 @@ export function HomeScreen({ navigation }: Props) {
         </TouchableOpacity>
       </View>
 
+      {/* Stats */}
+      <TouchableOpacity
+        style={styles.btnStats}
+        onPress={() => navigation.navigate('Stats')}
+      >
+        <Text style={styles.btnStatsText}>📊 战绩</Text>
+      </TouchableOpacity>
+
       {/* Logout */}
       <TouchableOpacity style={styles.btnLogout} onPress={handleLogout}>
         <Text style={styles.logoutText}>退出登录</Text>
@@ -162,6 +170,14 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   btnJoinText: { color: '#E8ECF2', fontSize: 16, fontWeight: '600' },
+  btnStats: {
+    backgroundColor: '#1A2332',
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderRadius: 10,
+    marginTop: 24,
+  },
+  btnStatsText: { color: '#D4A843', fontSize: 15, fontWeight: '600' },
   btnLogout: { position: 'absolute', bottom: 60 },
   logoutText: { color: '#666', fontSize: 14 },
 });
