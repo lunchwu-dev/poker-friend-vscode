@@ -13,7 +13,6 @@ import { SocketEvent, type RoomConfig } from '@poker-friends/shared';
 import { useAuthStore } from '../stores/authStore';
 import { useRoomStore } from '../stores/roomStore';
 import { socketService } from '../services/socket';
-import { useSocketEvents } from '../hooks/useSocketEvents';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -22,11 +21,10 @@ export function HomeScreen({ navigation }: Props) {
   const [joinCode, setJoinCode] = useState('');
   const roomCode = useRoomStore((s) => s.roomCode);
 
-  useSocketEvents();
-
   // Navigate to RoomLobby when room state arrives
   useEffect(() => {
     if (roomCode) {
+      setJoinCode('');
       navigation.navigate('RoomLobby', { roomCode });
     }
   }, [roomCode, navigation]);

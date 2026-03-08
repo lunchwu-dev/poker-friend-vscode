@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -26,8 +27,12 @@ export function LoginScreen({ navigation }: Props) {
 
     const { token } = useAuthStore.getState();
     if (token) {
-      socketService.connect(token);
-      navigation.replace('Home');
+      try {
+        socketService.connect(token);
+        navigation.replace('Home');
+      } catch (e) {
+        Alert.alert('连接失败', '无法连接到服务器，请稍后重试');
+      }
     }
   };
 

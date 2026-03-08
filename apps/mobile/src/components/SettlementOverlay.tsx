@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import type { GameHandResultPayload } from '@poker-friends/shared';
 import { CardView } from './CardView';
+import { useGameStore } from '../stores/gameStore';
 
 interface Props {
   result: GameHandResultPayload;
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export function SettlementOverlay({ result, myId }: Props) {
+  const resetHand = useGameStore((s) => s.resetHand);
   return (
     <View style={styles.overlay}>
       <View style={styles.card}>
@@ -61,6 +63,11 @@ export function SettlementOverlay({ result, myId }: Props) {
             ))}
           </View>
         )}
+
+        {/* Continue button */}
+        <TouchableOpacity style={styles.continueBtn} onPress={resetHand}>
+          <Text style={styles.continueBtnText}>继续</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -116,5 +123,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 4,
     marginTop: 16,
+  },
+  continueBtn: {
+    marginTop: 20,
+    backgroundColor: '#D4A843',
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  continueBtnText: {
+    color: '#080E1A',
+    fontSize: 16,
+    fontWeight: '700',
   },
 });

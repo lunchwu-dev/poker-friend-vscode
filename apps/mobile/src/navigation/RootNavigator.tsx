@@ -5,6 +5,7 @@ import { LoginScreen } from '../screens/LoginScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import { RoomLobbyScreen } from '../screens/RoomLobbyScreen';
 import { GameTableScreen } from '../screens/GameTableScreen';
+import { useSocketEvents } from '../hooks/useSocketEvents';
 
 export type RootStackParamList = {
   Login: undefined;
@@ -28,6 +29,9 @@ const linking = {
 };
 
 export function RootNavigator() {
+  // Subscribe to socket events at app level (activates when userId is set)
+  useSocketEvents();
+
   return (
     <NavigationContainer linking={linking}>
       <Stack.Navigator
