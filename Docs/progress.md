@@ -188,7 +188,111 @@
 - Gradle 9.0 不兼容 foojay-resolver-convention 0.5.0 → 降至 8.14.1
 - Android Gradle Plugin 要求最低 Gradle 8.13
 
-**提交**: 待 push
+**提交**: `7acafdd`
+
+### P4.5 — 客户端关键Bug修复 + 功能补全（✅ 已完成）
+
+**完成时间**: 2026-03-08
+
+#### Bug 修复（commit `1c71cd2`）
+
+| # | 问题 | 严重度 | 修复方案 | 状态 |
+|---|------|--------|---------|------|
+| 1 | App.tsx 渲染 RN 模板页而非 RootNavigator | CRITICAL | 替换 NewAppScreen → RootNavigator | ✅ |
+| 2 | GameTableScreen/RoomLobbyScreen 缺少 useSocketEvents | CRITICAL | 将 useSocketEvents 提升到 RootNavigator 级别（全局生效） | ✅ |
+| 3 | SettlementOverlay 无关闭按钮 | CRITICAL | 添加"继续"按钮，调用 resetHand() | ✅ |
+| 4 | HomeScreen 中 useSocketEvents 导致 Hook 顺序错误 | HIGH | 从 HomeScreen 移除，在 RootNavigator 统一订阅 | ✅ |
+| 5 | LoginScreen socket.connect() 无错误处理 | HIGH | 添加 try-catch + Alert 提示 | ✅ |
+| 6 | HomeScreen 加入房间后 joinCode 未清空 | MEDIUM | 导航到 RoomLobby 前 setJoinCode('') | ✅ |
+
+#### 功能补全（commit `7f0d384`）
+
+| # | 功能 | 描述 | 状态 |
+|---|------|------|------|
+| 1 | 断线重连（服务端） | 30s断线窗口 + 自动弃牌 + 重连恢复完整游戏快照 | ✅ |
+| 2 | 断线重连（客户端） | ConnectionBanner 组件 + connectionStore 状态管理 | ✅ |
+| 3 | 战绩页面（服务端） | /stats/me REST 端点 (JWT保护)，返回统计+最近20局 | ✅ |
+| 4 | 战绩页面（客户端） | StatsScreen: 6项统计卡片 + 最近对局列表 | ✅ |
+| 5 | RoomService 增强 | findRoomByUserId() 支持跨房间查找 | ✅ |
+
+**变更**: 14 files, +573/-42 lines  
+**验证**: 99 tests 全通过, APK 构建成功, 模拟器运行无 JS 错误  
+**提交**: `1c71cd2` + `7f0d384`（已推送到 GitHub）
+
+### P4.6 — 前端体验优化（✅ 已完成）
+
+**完成时间**: 2026-03-08
+
+> 仅解决影响可玩性和可用性的体验问题，不添加新功能。
+> 详细设计: `v1_enhancement.md`
+
+| # | 任务 | 差距项 | 状态 |
+|---|------|--------|------|
+| 1 | All-in 二次确认 | G3 | ✅ |
+| 2 | 按钮触摸反馈 | G2 | ✅ |
+| 3 | Loading 状态 | G7 | ✅ |
+| 4 | 结算自动消失 | G26 | ✅ |
+| 5 | 阶段进度条 | G6 | ✅ |
+| 6 | 大尺寸底牌展示 | G14 | ✅ |
+| 7 | 加注面板重设计 | G4 | ✅ |
+| 8 | 牌面角标布局 | G8 | ✅ |
+| 9 | 座位组件重设计 | G9 | ✅ |
+| 10 | 操作倒计时环 | G1 | ✅ |
+
+### P4.7 — 游戏逻辑缺陷修复（✅ 已完成）
+
+**完成时间**: 2026-03-08
+
+> 实机测试中发现的关键游戏逻辑缺陷，均已修复并验证。
+
+#### Bug #1：CountdownRing SVG 崩溃（白屏）
+
+| 项目 | 内容 |
+|------|------|
+| **现象** | 游戏开始后 App 白屏崩溃 |
+| **根因** | `CountdownRing` 组件使用了 `react-native-svg`（`RNSVGCircle`），该原生模块未在 Android 构建中链接 |
+| **修复** | 用纯 React Native `Animated` API 重写 `CountdownRing`：使用脉冲透明度 + 动态 borderColor（绿→金→红）替代 SVG strokeDashoffset |
+| **文件** | `apps/mobile/src/components/CountdownRing.tsx` (新建) |
+
+#### Bug #2：Android 返回键无拦截（误退出）
+
+| 项目 | 内容 |
+|------|------|
+| **现象** | 牌局进行中按 Android 返回键，直接退回首页，无确认提示；且服务端不知道玩家已离开，游戏卡在等待该玩家操作 |
+| **根因** | `GameTableScreen` 未注册 `BackHandler` 拦截；`RoomLobbyScreen` 同理 |
+| **修复** | - `GameTableScreen`：添加 `BackHandler` + `Alert` 确认对话框，确认后调用 `socketService.leaveRoom()` 并清理 stores<br>- `RoomLobbyScreen`：添加 `BackHandler` 触发 `handleLeave`<br>- `HomeScreen`：当 store 中存在 `roomCode` 时显示「🎮 游戏中 · 房间 #XXX → 返回房间」横幅 |
+| **文件** | `GameTableScreen.tsx`, `RoomLobbyScreen.tsx`, `HomeScreen.tsx` |
+
+#### Bug #3：牌局中玩家离场 → 游戏卡住
+
+| 项目 | 内容 |
+|------|------|
+| **现象** | 房主离开房间后，剩余玩家一直在等待已退出的玩家出牌，游戏无法继续 |
+| **根因** | `removePlayer()` 直接从引擎 `state.players` 数组中删除玩家，导致 `currentPlayerIndex` 偏移——后续玩家编号全部错位。且若离场玩家非当前操作者，其根本不会被弃牌，游戏永远等不到该玩家行动 |
+| **修复** | <ol><li>新增 `forcePlayerFold(roomCode, playerId)` 引擎方法：分"是/否当前操作者"两种情况妥善处理弃牌、检测是否需要结算或推进下注轮</li><li>Gateway `handleRoomLeave` 完全重写：先 forcePlayerFold → 广播弃牌 → 清座位 → leaveRoom → 广播状态</li><li>Gateway `handleDisconnect` 同步更新为 forcePlayerFold 模式</li><li>`autoStartNextHand` 在新手牌发之前清理已离场玩家（此时才从数组中移除，不破坏进行中的索引）</li></ol> |
+| **文件** | `game-engine.service.ts`, `game.gateway.ts` |
+
+#### Bug #4：房主离场后身份未转移
+
+| 项目 | 内容 |
+|------|------|
+| **现象** | 房主离开后，房间内剩余玩家无法执行房主操作（如开始下一场游戏） |
+| **根因** | `room.service.ts` 的 `leaveRoom()` 方法未处理房主离场的情况 |
+| **修复** | 在 `leaveRoom()` 中增加：若离开者是 `room.hostId`，将 `hostId` 设为房间 players Map 中下一位玩家的 ID |
+| **文件** | `room.service.ts` |
+
+#### 设计文档更新
+
+上述修复涉及的游戏逻辑规则已同步写入设计文档：
+- `v1-game-design.md` 新增 **4.7 牌局中途离场规则**（含强制弃牌流程、关键设计约束）
+- `v1-game-design.md` 更新 **4.3 房间生命周期**（增加房主离场分支）
+- `v1-game-design.md` 更新 **4.4 座位管理**（增加"牌局中离场"行为）
+- `v1-game-design.md` 更新 **4.5 房主权限**（增加"房主转移"规则）
+- `v1-game-design.md` 更新 **7.3 断线重连**（明确与 forcePlayerFold 的关联）
+- `v1-game-design.md` 更新 **9.2 操作超时与中途离场处理**
+- `game-design-document.md` 更新 **10.2 断线重连** 和 **8.4 操作体验**
+
+**验证**: 99 tests 全通过, TypeScript 编译无错误, 服务端重启健康检查正常
 
 ### P5 — 测试与上线
 - [ ] 单元测试 + 集成测试

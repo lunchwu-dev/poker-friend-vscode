@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Alert,
   Share,
+  BackHandler,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -55,6 +56,16 @@ export function RoomLobbyScreen({ navigation, route }: Props) {
     useRoomStore.getState().clearRoom();
     navigation.replace('Home');
   }, [navigation]);
+
+  // Intercept Android back button
+  useEffect(() => {
+    const onBack = () => {
+      handleLeave();
+      return true;
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBack);
+    return () => sub.remove();
+  }, [handleLeave]);
 
   const handleShare = useCallback(async () => {
     if (!roomCode) return;

@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  ActivityIndicator,
+  BackHandler,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -19,11 +21,13 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 export function HomeScreen({ navigation }: Props) {
   const user = useAuthStore((s) => s.user);
   const [joinCode, setJoinCode] = useState('');
+  const [loading, setLoading] = useState(false);
   const roomCode = useRoomStore((s) => s.roomCode);
 
   // Navigate to RoomLobby when room state arrives
   useEffect(() => {
     if (roomCode) {
+      setLoading(false);
       setJoinCode('');
       navigation.navigate('RoomLobby', { roomCode });
     }
@@ -32,12 +36,32 @@ export function HomeScreen({ navigation }: Props) {
   // Listen for creation errors
   useEffect(() => {
     const unsub = socketService.on(SocketEvent.GameError, (data) => {
+      setLoading(false);
       Alert.alert('错误', data.message);
     });
     return unsub;
   }, []);
 
+  // Prevent accidental back on Home (exit app)
+  useEffect(() => {
+    const onBack = () => {
+      // If in a room, don't exit — go rejoin instead
+      if (roomCode) return true;
+      return false; // allow default behavior (exit app)
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBack);
+    return () => sub.remove();
+  }, [roomCode]);
+
+  const handleRejoin = useCallback(() => {
+    if (roomCode) {
+      navigation.navigate('RoomLobby', { roomCode });
+    }
+  }, [roomCode, navigation]);
+
   const handleCreate = useCallback(() => {
+    if (loading) return;
+    setLoading(true);
     const config: RoomConfig = {
       maxPlayers: 6,
       smallBlind: 10,
@@ -47,16 +71,18 @@ export function HomeScreen({ navigation }: Props) {
       actionTimeout: 30,
     };
     socketService.createRoom({ config });
-  }, []);
+  }, [loading]);
 
   const handleJoin = useCallback(() => {
+    if (loading) return;
     const code = joinCode.trim().toUpperCase();
     if (code.length < 4) {
       Alert.alert('提示', '请输入房间号');
       return;
     }
+    setLoading(true);
     socketService.joinRoom({ roomCode: code });
-  }, [joinCode]);
+  }, [joinCode, loading]);
 
   const handleLogout = useCallback(() => {
     socketService.disconnect();
@@ -77,9 +103,25 @@ export function HomeScreen({ navigation }: Props) {
 
       <Text style={styles.logo}>♠ Poker Friends ♥</Text>
 
+      {/* Return to room banner */}
+      {roomCode && (
+        <TouchableOpacity style={styles.rejoinBanner} onPress={handleRejoin}>
+          <Text style={styles.rejoinText}>🎮 游戏中 · 房间 #{roomCode}</Text>
+          <Text style={styles.rejoinBtn}>返回房间 →</Text>
+        </TouchableOpacity>
+      )}
+
       {/* Create room */}
-      <TouchableOpacity style={styles.btnCreate} onPress={handleCreate}>
-        <Text style={styles.btnCreateText}>创建房间</Text>
+      <TouchableOpacity
+        style={[styles.btnCreate, loading && styles.btnDisabled]}
+        onPress={handleCreate}
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator color="#E8ECF2" />
+        ) : (
+          <Text style={styles.btnCreateText}>创建房间</Text>
+        )}
       </TouchableOpacity>
 
       {/* Join room */}
@@ -93,8 +135,16 @@ export function HomeScreen({ navigation }: Props) {
           autoCapitalize="characters"
           maxLength={6}
         />
-        <TouchableOpacity style={styles.btnJoin} onPress={handleJoin}>
-          <Text style={styles.btnJoinText}>加入</Text>
+        <TouchableOpacity
+          style={[styles.btnJoin, loading && styles.btnDisabled]}
+          onPress={handleJoin}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#E8ECF2" size="small" />
+          ) : (
+            <Text style={styles.btnJoinText}>加入</Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -180,4 +230,20 @@ const styles = StyleSheet.create({
   btnStatsText: { color: '#D4A843', fontSize: 15, fontWeight: '600' },
   btnLogout: { position: 'absolute', bottom: 60 },
   logoutText: { color: '#666', fontSize: 14 },
+  btnDisabled: { opacity: 0.6 },
+  rejoinBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#1B3A2A',
+    borderWidth: 1,
+    borderColor: '#2A6A4A',
+    borderRadius: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    width: 300,
+    marginBottom: 20,
+  },
+  rejoinText: { color: '#8FA', fontSize: 14, fontWeight: '600' },
+  rejoinBtn: { color: '#D4A843', fontSize: 14, fontWeight: '700' },
 });

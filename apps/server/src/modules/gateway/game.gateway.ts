@@ -162,26 +162,32 @@ export class GameGateway
       this.disconnectTimers.delete(userId);
       this.logger.log(`Disconnect timeout: ${userId} in room ${roomCode}`);
 
-      // If game is active and it's this player's turn, auto-fold
+      // If game is active, force-fold the disconnected player
       if (room.isPlaying) {
-        const gameState = this.engine.getGameState(roomCode);
-        if (gameState && gameState.currentPlayerIndex !== null) {
-          const currentPlayer =
-            gameState.players[gameState.currentPlayerIndex];
-          if (currentPlayer.playerId === userId) {
-            this.clearActionTimer(roomCode);
-            const result = this.engine.handleTimeout(roomCode);
-            if (result.valid) {
-              const autoAction: PlayerAction = {
-                action: ActionType.Fold,
-              };
-              this.broadcastActionResult(
-                roomCode,
-                userId,
-                autoAction,
-                result,
-              );
-            }
+        this.clearActionTimer(roomCode);
+        const foldResult = this.engine.forcePlayerFold(roomCode, userId);
+
+        if (foldResult?.valid) {
+          const actorSeat = room.seats.find((s) => s.playerId === userId);
+          this.server.to(roomCode).emit(SocketEvent.GamePlayerActed, {
+            seatIndex: actorSeat?.seatIndex ?? -1,
+            playerId: userId,
+            action: ActionType.Fold,
+            amount: 0,
+            potTotal: foldResult.pots.reduce((sum, p) => sum + p.amount, 0),
+          } as GamePlayerActedPayload);
+
+          if (foldResult.newCommunityCards?.length) {
+            this.server.to(roomCode).emit(SocketEvent.GameDealCommunity, {
+              cards: foldResult.newCommunityCards,
+              stage: foldResult.newStage ?? '',
+            } as GameDealCommunityPayload);
+          }
+
+          if (foldResult.handSettlement) {
+            this.handleSettlement(roomCode, foldResult);
+          } else if (foldResult.nextPlayerId) {
+            this.emitActionOn(roomCode, foldResult.nextPlayerId);
           }
         }
       }
@@ -192,6 +198,9 @@ export class GameGateway
         this.server
           .to(roomCode)
           .emit(SocketEvent.RoomPlayerLeft, { playerId: userId });
+        this.server
+          .to(roomCode)
+          .emit(SocketEvent.RoomState, this.roomService.getRoomState(roomCode));
       }
     }, RECONNECT_TIMEOUT * 1000);
 
@@ -268,11 +277,65 @@ export class GameGateway
     const roomCode = this.findUserRoom(client);
     if (!roomCode) return;
 
+    const room = this.roomService.getRoom(roomCode);
+
+    // If game is active, force-fold the leaving player
+    if (room?.isPlaying) {
+      this.clearActionTimer(roomCode);
+      const foldResult = this.engine.forcePlayerFold(roomCode, userId);
+
+      // Broadcast the fold action
+      if (foldResult?.valid) {
+        const actorSeat = room.seats.find((s) => s.playerId === userId);
+        this.server.to(roomCode).emit(SocketEvent.GamePlayerActed, {
+          seatIndex: actorSeat?.seatIndex ?? -1,
+          playerId: userId,
+          action: ActionType.Fold,
+          amount: 0,
+          potTotal: foldResult.pots.reduce((sum, p) => sum + p.amount, 0),
+        } as GamePlayerActedPayload);
+
+        // Handle downstream effects (settlement, new community cards, next player)
+        if (foldResult.newCommunityCards?.length) {
+          this.server.to(roomCode).emit(SocketEvent.GameDealCommunity, {
+            cards: foldResult.newCommunityCards,
+            stage: foldResult.newStage ?? '',
+          } as GameDealCommunityPayload);
+        }
+
+        if (foldResult.handSettlement) {
+          this.handleSettlement(roomCode, foldResult);
+        } else if (foldResult.nextPlayerId) {
+          this.emitActionOn(roomCode, foldResult.nextPlayerId);
+        }
+      }
+
+      // Clear the seat in room data
+      const seat = room.seats.find((s) => s.playerId === userId);
+      if (seat) {
+        seat.playerId = null;
+        seat.nickname = null;
+        seat.avatar = null;
+        seat.chips = 0;
+        seat.status = 'empty';
+        seat.currentBet = 0;
+      }
+    }
+
+    // Remove from room (also transfers host if needed)
     this.roomService.leaveRoom(roomCode, userId);
     client.leave(roomCode);
     this.server
       .to(roomCode)
       .emit(SocketEvent.RoomPlayerLeft, { playerId: userId });
+
+    // Broadcast updated room state (includes new hostId)
+    const updatedRoom = this.roomService.getRoom(roomCode);
+    if (updatedRoom) {
+      this.server
+        .to(roomCode)
+        .emit(SocketEvent.RoomState, this.roomService.getRoomState(roomCode));
+    }
   }
 
   @SubscribeMessage(SocketEvent.SeatSit)
@@ -352,6 +415,9 @@ export class GameGateway
     });
 
     this.roomService.setPlaying(roomCode, true);
+    this.server
+      .to(roomCode)
+      .emit(SocketEvent.RoomState, this.roomService.getRoomState(roomCode));
 
     const result = this.engine.startHand(roomCode);
 
@@ -563,11 +629,83 @@ export class GameGateway
     }
 
     setTimeout(() => {
+      this.autoStartNextHand(roomCode);
+    }, SETTLE_DELAY_MS);
+  }
+
+  /**
+   * After settlement delay, remove busted players and auto-start the next hand.
+   * Falls back to lobby if fewer than 2 players remain.
+   */
+  private autoStartNextHand(roomCode: string): void {
+    const room = this.roomService.getRoom(roomCode);
+    if (!room) return;
+
+    // Remove busted players from engine and room seats
+    const busted = this.engine.removeBustedPlayers(roomCode);
+    for (const pid of busted) {
+      this.roomService.updateSeatChips(roomCode, pid, 0);
+      // Reset seat to empty so others can sit
+      const seat = room.seats.find((s) => s.playerId === pid);
+      if (seat) {
+        seat.playerId = null;
+        seat.nickname = null;
+        seat.avatar = null;
+        seat.chips = 0;
+        seat.status = 'empty';
+        seat.currentBet = 0;
+      }
+    }
+
+    // Remove departed players from engine (players who left mid-hand)
+    const engineState = this.engine.getGameState(roomCode);
+    if (engineState) {
+      const departedIds = engineState.players
+        .filter((ep) => !room.players.has(ep.playerId))
+        .map((ep) => ep.playerId);
+      for (const pid of departedIds) {
+        this.engine.removePlayer(roomCode, pid);
+      }
+    }
+
+    const seated = this.roomService.getSeatedPlayers(roomCode);
+    if (seated.length < 2) {
+      // Not enough players — go back to lobby
       this.roomService.setPlaying(roomCode, false);
       this.server
         .to(roomCode)
         .emit(SocketEvent.RoomState, this.roomService.getRoomState(roomCode));
-    }, SETTLE_DELAY_MS);
+      return;
+    }
+
+    // Start next hand
+    try {
+      const result = this.engine.startHand(roomCode);
+
+      const startPayload: GameHandStartPayload = {
+        handNumber: result.handNumber,
+        dealerSeatIndex: result.dealerSeatIndex,
+        seats: room.seats,
+      };
+      this.server.to(roomCode).emit(SocketEvent.GameHandStart, startPayload);
+
+      for (const [playerId, cards] of result.playerHoleCards) {
+        const socketId = this.roomService.getSocketId(roomCode, playerId);
+        if (socketId) {
+          this.server
+            .to(socketId)
+            .emit(SocketEvent.GameDealHole, { cards } as GameDealHolePayload);
+        }
+      }
+
+      this.emitActionOn(roomCode, result.firstPlayerId);
+    } catch (err) {
+      this.logger.error('Auto-start next hand failed', err);
+      this.roomService.setPlaying(roomCode, false);
+      this.server
+        .to(roomCode)
+        .emit(SocketEvent.RoomState, this.roomService.getRoomState(roomCode));
+    }
   }
 
   private findUserRoom(client: AuthenticatedSocket): string | undefined {

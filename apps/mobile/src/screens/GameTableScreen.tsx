@@ -1,10 +1,12 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Dimensions,
   useWindowDimensions,
+  BackHandler,
+  Alert,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -15,6 +17,8 @@ import { PlayerSeat } from '../components/PlayerSeat';
 import { CardView } from '../components/CardView';
 import { ActionPanel } from '../components/ActionPanel';
 import { SettlementOverlay } from '../components/SettlementOverlay';
+import { StageProgressBar } from '../components/StageProgressBar';
+import { socketService } from '../services/socket';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'GameTable'>;
 
@@ -42,10 +46,44 @@ const STAGE_LABELS: Record<string, string> = {
   SETTLE: '结算',
 };
 
-export function GameTableScreen({ route }: Props) {
+export function GameTableScreen({ navigation, route }: Props) {
   const { roomCode } = route.params;
   const userId = useAuthStore((s) => s.user?.id);
   const config = useRoomStore((s) => s.config);
+  const isPlaying = useRoomStore((s) => s.isPlaying);
+  const wasPlaying = useRef(isPlaying);
+
+  // Navigate back to lobby only when isPlaying transitions true → false
+  useEffect(() => {
+    if (wasPlaying.current && !isPlaying) {
+      navigation.replace('RoomLobby', { roomCode });
+    }
+    wasPlaying.current = isPlaying;
+  }, [isPlaying, roomCode, navigation]);
+
+  // Intercept Android back button — confirm before leaving mid-game
+  const handleLeaveConfirm = useCallback(() => {
+    socketService.leaveRoom();
+    useRoomStore.getState().clearRoom();
+    useGameStore.getState().resetHand();
+    navigation.replace('Home');
+  }, [navigation]);
+
+  useEffect(() => {
+    const onBack = () => {
+      Alert.alert(
+        '离开牌局',
+        '游戏进行中，离开将自动弃牌并退出房间。确定要离开吗？',
+        [
+          { text: '继续游戏', style: 'cancel' },
+          { text: '确认离开', style: 'destructive', onPress: handleLeaveConfirm },
+        ],
+      );
+      return true; // prevent default back behavior
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBack);
+    return () => sub.remove();
+  }, [handleLeaveConfirm]);
 
   const {
     seats,
@@ -117,15 +155,29 @@ export function GameTableScreen({ route }: Props) {
                 isDealer={dealerSeatIndex === idx}
                 holeCards={isMe ? myHoleCards : undefined}
                 showCards={showCards}
+                timeoutMs={actionSeatIndex === idx ? timeoutMs : undefined}
               />
             </View>
           );
         })}
       </View>
 
+      {/* Stage progress bar */}
+      {stage !== 'IDLE' && stage !== 'SETTLE' && (
+        <StageProgressBar stage={stage} />
+      )}
+
+      {/* Large hole cards display */}
+      {myHoleCards.length === 2 && !handResult && (
+        <View style={styles.holeCardsArea}>
+          <CardView card={myHoleCards[0]} size="xl" />
+          <CardView card={myHoleCards[1]} size="xl" />
+        </View>
+      )}
+
       {/* Action panel */}
       {isMyTurn && availableActions && (
-        <ActionPanel actions={availableActions} />
+        <ActionPanel actions={availableActions} potTotal={potTotal} />
       )}
 
       {/* Settlement overlay */}
@@ -191,5 +243,12 @@ const styles = StyleSheet.create({
   seatWrapper: {
     position: 'absolute',
     transform: [{ translateX: -40 }, { translateY: -30 }],
+  },
+  holeCardsArea: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 8,
+    paddingBottom: 4,
   },
 });

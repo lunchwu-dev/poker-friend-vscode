@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import type { GameHandResultPayload } from '@poker-friends/shared';
 import { CardView } from './CardView';
 import { useGameStore } from '../stores/gameStore';
+
+const AUTO_DISMISS_SECONDS = 3;
 
 interface Props {
   result: GameHandResultPayload;
@@ -11,6 +13,21 @@ interface Props {
 
 export function SettlementOverlay({ result, myId }: Props) {
   const resetHand = useGameStore((s) => s.resetHand);
+  const [countdown, setCountdown] = useState(AUTO_DISMISS_SECONDS);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          resetHand();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resetHand]);
   return (
     <View style={styles.overlay}>
       <View style={styles.card}>
@@ -66,7 +83,7 @@ export function SettlementOverlay({ result, myId }: Props) {
 
         {/* Continue button */}
         <TouchableOpacity style={styles.continueBtn} onPress={resetHand}>
-          <Text style={styles.continueBtnText}>继续</Text>
+          <Text style={styles.continueBtnText}>继续 ({countdown}s)</Text>
         </TouchableOpacity>
       </View>
     </View>

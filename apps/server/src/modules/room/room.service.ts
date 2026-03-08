@@ -75,6 +75,16 @@ export class RoomService {
 
     if (room.players.size === 0) {
       this.rooms.delete(roomCode);
+      return;
+    }
+
+    // Transfer host if the leaving player was the host
+    if (room.hostId === userId) {
+      // Pick the first remaining player as new host
+      const nextHost = room.players.keys().next().value;
+      if (nextHost) {
+        room.hostId = nextHost;
+      }
     }
   }
 

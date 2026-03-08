@@ -237,6 +237,62 @@ export class GameEngineService {
     this.games.delete(roomCode);
   }
 
+  /** Remove players with 0 chips and return their IDs */
+  removeBustedPlayers(roomCode: string): string[] {
+    const state = this.games.get(roomCode);
+    if (!state) return [];
+    const busted = state.players.filter((p) => p.chips <= 0).map((p) => p.playerId);
+    state.players = state.players.filter((p) => p.chips > 0);
+    return busted;
+  }
+
+  /** Remove a specific player from the engine (between hands only) */
+  removePlayer(roomCode: string, playerId: string): void {
+    const state = this.games.get(roomCode);
+    if (!state) return;
+    state.players = state.players.filter((p) => p.playerId !== playerId);
+  }
+
+  /**
+   * Force-fold a player who is leaving mid-hand.
+   * - If it is their turn: executes a fold action (advances the game).
+   * - If it is NOT their turn: marks them folded and checks for hand-end.
+   * Returns an ActionResult if the game state changed (settlement or next player),
+   * or null if nothing needs broadcasting.
+   */
+  forcePlayerFold(roomCode: string, playerId: string): ActionResult | null {
+    const state = this.games.get(roomCode);
+    if (!state) return null;
+
+    const playerIdx = state.players.findIndex((p) => p.playerId === playerId);
+    if (playerIdx === -1) return null;
+
+    const player = state.players[playerIdx];
+    if (player.status === 'folded') return null; // already folded
+
+    // Case 1: It is this player's turn → use handleAction for proper game flow
+    if (state.currentPlayerIndex === playerIdx) {
+      return this.handleAction(roomCode, playerId, { action: ActionType.Fold });
+    }
+
+    // Case 2: Not their turn → mark folded silently
+    player.status = 'folded';
+    player.hasActedThisRound = true;
+
+    // Check if only one active player remains → immediate settlement
+    const active = this.activePlayers(state);
+    if (active.length === 1) {
+      return this.settleHandNoShowdown(state, active[0].playerId);
+    }
+
+    // Check if the betting round is now complete
+    if (state.currentPlayerIndex !== null && this.isBettingRoundOver(state)) {
+      return this.endBettingRound(state);
+    }
+
+    return null; // game continues, no broadcast needed
+  }
+
   // ── Betting round helpers ──────────────────────────────────────────────────
 
   private isBettingRoundOver(state: EngineGameState): boolean {
