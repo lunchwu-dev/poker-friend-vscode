@@ -1,32 +1,5 @@
-# ===== Stage 1: Builder =====
-FROM node:20-alpine AS builder
-
-# Install pnpm
-RUN corepack enable && corepack prepare pnpm@10.30.3 --activate
-
-WORKDIR /app
-
-# Copy workspace config
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
-COPY packages/shared/package.json packages/shared/
-COPY apps/server/package.json apps/server/
-
-# Install all dependencies (including devDependencies for build)
-RUN pnpm install --frozen-lockfile
-
-# Copy source code
-COPY packages/shared/ packages/shared/
-COPY apps/server/ apps/server/
-
-# Build shared package first, then server
-RUN pnpm --filter @poker-friends/shared build
-RUN pnpm --filter @poker-friends/server build
-
-# Generate Prisma client
-RUN cd apps/server && npx prisma generate
-
-# ===== Stage 2: Runner =====
-FROM node:20-alpine AS runner
+# ===== Single-stage: pre-built artifacts =====
+FROM node:22-alpine
 
 RUN corepack enable && corepack prepare pnpm@10.30.3 --activate
 
@@ -36,20 +9,23 @@ WORKDIR /app
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY packages/shared/package.json packages/shared/
 COPY apps/server/package.json apps/server/
+
+# Use hoisted node-linker to avoid pnpm symlink issues in Docker
+RUN echo "node-linker=hoisted" > .npmrc
 
 # Install production dependencies only
-RUN pnpm install --frozen-lockfile --prod
+RUN pnpm install --no-frozen-lockfile --prod
 
-# Copy built artifacts from builder
-COPY --from=builder /app/packages/shared/dist packages/shared/dist
-COPY --from=builder /app/apps/server/dist apps/server/dist
-COPY --from=builder /app/apps/server/node_modules/.prisma apps/server/node_modules/.prisma
+# Copy pre-built artifacts (built locally before deploy)
+COPY packages/shared/dist/ packages/shared/dist/
+COPY apps/server/dist/ apps/server/dist/
 
-# Copy Prisma schema (needed for migrate deploy)
-COPY apps/server/prisma apps/server/prisma
+# Copy Prisma schema and generate client
+COPY apps/server/prisma/ apps/server/prisma/
+RUN cd apps/server && npx prisma generate
 
 # Copy public assets
-COPY apps/server/public apps/server/public
+COPY apps/server/public/ apps/server/public/
 
 ENV NODE_ENV=production
 ENV PORT=3000

@@ -18,7 +18,7 @@ import {
   type GameErrorPayload,
 } from '@poker-friends/shared';
 
-const SERVER_URL = __DEV__ ? 'http://10.0.2.2:3000' : 'https://api.pokerfriends.app';
+const SERVER_URL = __DEV__ ? 'http://10.0.2.2:3000' : 'https://poker-friends-server.fly.dev';
 
 type Listener<T = unknown> = (data: T) => void;
 

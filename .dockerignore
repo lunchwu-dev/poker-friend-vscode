@@ -1,4 +1,4 @@
-node_modules
+**/node_modules
 .git
 .gitignore
 Docs
@@ -9,9 +9,9 @@ scripts
 .env
 .env.*
 docker-compose.yml
-dist
-**/dist
 **/.turbo
 **/coverage
 **/*.test.ts
 **/*.spec.ts
+.pnpm-store
+**/.pnpm-store

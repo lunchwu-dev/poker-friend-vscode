@@ -11,7 +11,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { useAuthStore } from '../stores/authStore';
 
-const SERVER_URL = __DEV__ ? 'http://10.0.2.2:3000' : 'https://api.pokerfriends.app';
+const SERVER_URL = __DEV__ ? 'http://10.0.2.2:3000' : 'https://poker-friends-server.fly.dev';
 
 const RANK_NAMES: Record<number, string> = {
   0: '皇家同花顺',
